@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown (if needed)
 
 
-app = FastAPI(title="Terraform Log Viewer API", lifespan=lifespan)
+app = FastAPI(title="Terraform LogViewer API", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -32,7 +32,7 @@ app.include_router(router, prefix="/api", tags=["logs"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Terraform Log Viewer API", "status": "running"}
+    return {"message": "Terraform LogViewer API", "status": "running"}
 
 
 @app.get("/health")

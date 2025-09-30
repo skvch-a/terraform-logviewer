@@ -23,7 +23,7 @@ async def upload_log_file(
     content_str = content.decode('utf-8')
 
     # Parse the log file
-    logs = parse_terraform_log(content_str, file.filename)
+    logs = parse_terraform_log(content_str)
 
     if not logs:
         raise HTTPException(status_code=400, detail="No valid log entries found in the file")
