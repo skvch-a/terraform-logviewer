@@ -1,12 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.api import router
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Terraform Log Viewer API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create database tables on startup
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Cleanup on shutdown (if needed)
+
+
+app = FastAPI(title="Terraform Log Viewer API", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
