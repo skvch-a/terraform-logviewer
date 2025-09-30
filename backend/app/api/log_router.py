@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas import LogEntry, LogUploadResponse
-from app.services import parse_terraform_log, save_logs_to_db, get_all_logs, get_logs_by_level
+from app.services import parse_terraform_log, save_logs_to_db, get_all_logs, get_logs_by_level, search_logs
 
 router = APIRouter()
 
@@ -43,11 +43,19 @@ def get_logs(
         skip: int = Query(0, ge=0),
         limit: int = Query(100, ge=1, le=1000),
         level: Optional[str] = None,
+        tf_resource_type: Optional[str] = None,
+        timestamp_from: Optional[str] = None,
+        timestamp_to: Optional[str] = None,
+        group_by: Optional[str] = None,
+        search_query: Optional[str] = None,
         db: Session = Depends(get_db)
 ):
     """Get logs from database with optional filtering."""
-    if level:
-        logs = get_logs_by_level(db, level)
+    if any([level, tf_resource_type, timestamp_from, timestamp_to, group_by, search_query]):
+        logs = search_logs(
+            db, skip, limit, level, tf_resource_type,
+            timestamp_from, timestamp_to, group_by, search_query
+        )
     else:
         logs = get_all_logs(db, skip, limit)
 

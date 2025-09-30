@@ -14,4 +14,6 @@ class TerraformLog(Base):
     log_level = Column(String, index=True)
     timestamp = Column(String)
     message = Column(Text)
+    tf_req_id = Column(String, index=True, nullable=True)  # Add request ID
+    tf_resource_type = Column(String, index=True, nullable=True)  # Add resource type
     raw_data = Column(JSON)
