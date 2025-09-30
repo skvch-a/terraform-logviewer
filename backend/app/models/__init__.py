@@ -1,3 +1,3 @@
-from terraform_log import TerraformLog
+from .terraform_log import TerraformLog
 
 __all__ = ['TerraformLog']
