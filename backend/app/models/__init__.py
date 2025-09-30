@@ -1,15 +1,3 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON
-from datetime import datetime
-from app.database import Base
+from terraform_log import TerraformLog
 
-
-class TerraformLog(Base):
-    __tablename__ = "terraform_logs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, index=True)
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
-    log_level = Column(String, index=True)
-    timestamp = Column(String)
-    message = Column(Text)
-    raw_data = Column(JSON)
+__all__ = ['TerraformLog']

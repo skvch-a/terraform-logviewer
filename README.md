@@ -19,7 +19,7 @@
 - Nginx для production
 
 ### Backend
-- Python 3.11
+- Python 3.12
 - FastAPI - современный веб-фреймворк
 - SQLAlchemy - ORM для работы с БД
 - PostgreSQL - база данных
