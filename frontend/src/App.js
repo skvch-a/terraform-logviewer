@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import FileUpload from './components/FileUpload';
 import LogViewer from './components/LogViewer';
 import SectionsView from './components/SectionsView';
+import GanttView from './components/GanttView';
 import './App.css';
 
 function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [viewMode, setViewMode] = useState('logs'); // 'logs' or 'sections'
+  const [viewMode, setViewMode] = useState('logs'); // 'logs', 'sections', or 'gantt'
 
   const handleUploadSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -29,6 +30,12 @@ function App() {
           >
             Sections Parser
           </button>
+          <button 
+            style={{...styles.toggleButton, ...(viewMode === 'gantt' ? styles.activeButton : {})}}
+            onClick={() => setViewMode('gantt')}
+          >
+            Gantt Chart
+          </button>
         </div>
       </header>
       <main className="App-main">
@@ -37,8 +44,13 @@ function App() {
             <FileUpload onUploadSuccess={handleUploadSuccess} />
             <LogViewer refreshTrigger={refreshTrigger} />
           </>
-        ) : (
+        ) : viewMode === 'sections' ? (
           <SectionsView />
+        ) : (
+          <>
+            <FileUpload onUploadSuccess={handleUploadSuccess} />
+            <GanttView refreshTrigger={refreshTrigger} />
+          </>
         )}
       </main>
     </div>

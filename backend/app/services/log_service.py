@@ -203,3 +203,62 @@ def delete_all_logs(db: Session) -> int:
     db.query(TerraformLog).delete()
     db.commit()
     return count
+
+
+def get_gantt_data(db: Session) -> list[dict]:
+    """
+    Get aggregated request data for Gantt chart visualization.
+    Groups logs by tf_req_id and calculates start/end timestamps.
+    """
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    # Query to get all logs with tf_req_id
+    logs_with_req_id = db.query(TerraformLog).filter(
+        TerraformLog.tf_req_id.isnot(None)
+    ).order_by(TerraformLog.timestamp).all()
+    
+    # Group by tf_req_id
+    requests_data = {}
+    for log in logs_with_req_id:
+        req_id = log.tf_req_id
+        if req_id not in requests_data:
+            requests_data[req_id] = {
+                'tf_req_id': req_id,
+                'tf_rpc': log.tf_rpc,
+                'tf_resource_type': log.tf_resource_type,
+                'logs': [],
+                'start_timestamp': None,
+                'end_timestamp': None,
+            }
+        
+        requests_data[req_id]['logs'].append({
+            'timestamp': log.timestamp,
+            'level': log.log_level,
+            'message': log.message,
+        })
+        
+        # Update RPC and resource type if not set
+        if not requests_data[req_id]['tf_rpc'] and log.tf_rpc:
+            requests_data[req_id]['tf_rpc'] = log.tf_rpc
+        if not requests_data[req_id]['tf_resource_type'] and log.tf_resource_type:
+            requests_data[req_id]['tf_resource_type'] = log.tf_resource_type
+    
+    # Calculate start and end timestamps for each request
+    gantt_data = []
+    for req_id, data in requests_data.items():
+        if data['logs']:
+            # Sort logs by timestamp
+            sorted_logs = sorted(data['logs'], key=lambda x: x['timestamp'] or '')
+            data['start_timestamp'] = sorted_logs[0]['timestamp']
+            data['end_timestamp'] = sorted_logs[-1]['timestamp']
+            data['log_count'] = len(sorted_logs)
+            
+            # Remove individual logs from response to reduce payload
+            del data['logs']
+            gantt_data.append(data)
+    
+    # Sort by start timestamp
+    gantt_data.sort(key=lambda x: x['start_timestamp'] or '')
+    
+    return gantt_data

@@ -46,3 +46,8 @@ export const parseLogWithSections = async (file) => {
 
   return response.data;
 };
+
+export const getGanttData = async () => {
+  const response = await axios.get(`${API_BASE_URL}/gantt`);
+  return response.data;
+};
