@@ -151,6 +151,12 @@ def save_logs_to_db(db: Session, logs: list[dict], filename: str) -> int:
             log_level=log.get('@level') or log.get('level'),
             timestamp=log.get('@timestamp') or log.get('timestamp'),
             message=log.get('@message') or log.get('message'),
+            caller=log.get('@caller'),
+            module=log.get('@module'),
+            tf_provider_addr=log.get('tf_provider_addr'),
+            tf_req_id=log.get('tf_req_id'),
+            tf_resource_type=log.get('tf_resource_type'),
+            tf_rpc=log.get('tf_rpc'),
             raw_data=log
         )
         db.add(log_entry)

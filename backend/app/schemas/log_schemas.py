@@ -11,6 +11,12 @@ class LogEntry(BaseModel):
     log_level: Optional[str] = None
     timestamp: Optional[str] = None
     message: Optional[str] = None
+    caller: Optional[str] = None
+    module: Optional[str] = None
+    tf_provider_addr: Optional[str] = None
+    tf_req_id: Optional[str] = None
+    tf_resource_type: Optional[str] = None
+    tf_rpc: Optional[str] = None
     raw_data: Optional[Any] = None
 
     class Config:
