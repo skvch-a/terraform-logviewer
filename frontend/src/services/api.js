@@ -28,3 +28,21 @@ export const getLogs = async (skip = 0, limit = 100, options = {}) => {
   const response = await axios.get(`${API_BASE_URL}/logs`, { params });
   return response.data;
 };
+
+export const clearSession = async () => {
+  const response = await axios.delete(`${API_BASE_URL}/sessions`);
+  return response.data;
+};
+
+export const parseLogWithSections = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await axios.post(`${API_BASE_URL}/logs/sections`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
+};

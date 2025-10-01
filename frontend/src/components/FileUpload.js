@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { uploadLogFile } from '../services/api';
+import { uploadLogFile, clearSession } from '../services/api';
 
 function FileUpload({ onUploadSuccess }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState('');
 
   const handleFileChange = (e) => {
@@ -34,6 +35,27 @@ function FileUpload({ onUploadSuccess }) {
     }
   };
 
+  const handleClearSession = async () => {
+    if (!window.confirm('Are you sure you want to clear all logs from the database? This action cannot be undone.')) {
+      return;
+    }
+
+    setClearing(true);
+    setMessage('');
+
+    try {
+      const result = await clearSession();
+      setMessage(`Success! Cleared ${result.deleted_count} log entries from the database`);
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
+    } catch (error) {
+      setMessage(`Error: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <h2>Upload Terraform Log File</h2>
@@ -50,6 +72,13 @@ function FileUpload({ onUploadSuccess }) {
           style={styles.uploadButton}
         >
           {uploading ? 'Uploading...' : 'Upload'}
+        </button>
+        <button
+          onClick={handleClearSession}
+          disabled={clearing}
+          style={styles.clearButton}
+        >
+          {clearing ? 'Clearing...' : 'Reset Session'}
         </button>
       </div>
       {message && (
@@ -79,6 +108,15 @@ const styles = {
   uploadButton: {
     padding: '10px 20px',
     backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  clearButton: {
+    padding: '10px 20px',
+    backgroundColor: '#dc3545',
     color: 'white',
     border: 'none',
     borderRadius: '4px',
