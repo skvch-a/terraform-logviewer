@@ -4,8 +4,15 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import LogEntry, LogUploadResponse
-from app.services import parse_terraform_log, save_logs_to_db, get_all_logs, get_logs_by_level
+from app.schemas import LogEntry, LogUploadResponse, LogWithSectionsResponse, DeleteResponse
+from app.services import (
+    parse_terraform_log, 
+    parse_terraform_log_with_sections,
+    save_logs_to_db, 
+    get_all_logs, 
+    get_logs_by_level,
+    delete_all_logs
+)
 
 router = APIRouter()
 
@@ -38,6 +45,26 @@ async def upload_log_file(
     )
 
 
+@router.post("/logs/sections", response_model=LogWithSectionsResponse)
+async def parse_log_with_sections(
+        file: UploadFile = File(...),
+):
+    """Parse Terraform JSON log file with sections without saving to database."""
+    if not file.filename.endswith(('.json', '.log')):
+        raise HTTPException(status_code=400, detail="Only JSON files are supported")
+
+    content = await file.read()
+    content_str = content.decode('utf-8')
+
+    # Parse the log file with sections
+    result = parse_terraform_log_with_sections(content_str, file.filename)
+
+    if not result or not result.get('logs'):
+        raise HTTPException(status_code=400, detail="No valid log entries found in the file")
+
+    return result
+
+
 @router.get("/logs", response_model=List[LogEntry])
 def get_logs(
         skip: int = Query(0, ge=0),
@@ -68,3 +95,13 @@ def get_logs(
         )
 
     return logs
+
+
+@router.delete("/sessions", response_model=DeleteResponse)
+def clear_session(db: Session = Depends(get_db)):
+    """Clear all logs from the database (reset session)."""
+    count = delete_all_logs(db)
+    return DeleteResponse(
+        message="Session cleared successfully",
+        deleted_count=count
+    )

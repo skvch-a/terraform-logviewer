@@ -195,3 +195,11 @@ def get_logs_by_level(db: Session, level: str):
     """Get logs filtered by level."""
     return db.query(TerraformLog).filter(TerraformLog.log_level == level).order_by(
         TerraformLog.uploaded_at.desc()).all()
+
+
+def delete_all_logs(db: Session) -> int:
+    """Delete all logs from database. Returns count of deleted logs."""
+    count = db.query(TerraformLog).count()
+    db.query(TerraformLog).delete()
+    db.commit()
+    return count

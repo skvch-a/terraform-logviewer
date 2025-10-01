@@ -56,7 +56,7 @@ function LogViewer({ refreshTrigger }) {
 
   useEffect(() => {
     fetchLogs();
-  }, [refreshTrigger, levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter]);
+  }, [refreshTrigger, levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter, fetchLogs]);
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
