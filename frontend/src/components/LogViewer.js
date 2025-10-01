@@ -3,16 +3,35 @@ import { getLogs } from '../services/api';
 
 function LogViewer({ refreshTrigger }) {
   const [logs, setLogs] = useState([]);
+  const [groupedLogs, setGroupedLogs] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState('');
+
+  // State for filters
+  const [levelFilter, setLevelFilter] = useState('');
+  const [resourceTypeFilter, setResourceTypeFilter] = useState('');
+  const [startTimestamp, setStartTimestamp] = useState('');
+  const [endTimestamp, setEndTimestamp] = useState('');
+  const [reqIdFilter, setReqIdFilter] = useState('');
+  const [rpcFilter, setRpcFilter] = useState('');
+  const [messageFilter, setMessageFilter] = useState('');
+
 
   const fetchLogs = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const data = await getLogs(0, 100, filter || null);
+      const filterOptions = {
+        level: levelFilter,
+        tf_resource_type: resourceTypeFilter,
+        start_timestamp: startTimestamp,
+        end_timestamp: endTimestamp,
+        tf_req_id: reqIdFilter,
+        tf_rpc: rpcFilter,
+        message_contains: messageFilter,
+      };
+      const data = await getLogs(0, 1000, filterOptions); // Increased limit for better grouping
       setLogs(data);
     } catch (err) {
       setError(`Error loading logs: ${err.message}`);
@@ -21,9 +40,28 @@ function LogViewer({ refreshTrigger }) {
     }
   };
 
+  // Group logs by tf_req_id
+  useEffect(() => {
+    const groups = logs.reduce((acc, log) => {
+      const key = log.tf_req_id || 'no-request-id';
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(log);
+      return acc;
+    }, {});
+    setGroupedLogs(groups);
+  }, [logs]);
+
+
   useEffect(() => {
     fetchLogs();
-  }, [refreshTrigger, filter]);
+  }, [refreshTrigger, fetchLogs]);
+
+  const handleFilterSubmit = (e) => {
+    e.preventDefault();
+    fetchLogs();
+  };
 
   const getLevelColor = (level) => {
     const colors = {
@@ -41,55 +79,96 @@ function LogViewer({ refreshTrigger }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2>Terraform Logs</h2>
-        <div style={styles.filterArea}>
-          <label>Filter by level: </label>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            style={styles.select}
-          >
-            <option value="">All</option>
-            <option value="error">Error</option>
-            <option value="warn">Warning</option>
-            <option value="info">Info</option>
-            <option value="debug">Debug</option>
-            <option value="trace">Trace</option>
-          </select>
-        </div>
       </div>
+
+      <form onSubmit={handleFilterSubmit} style={styles.filterForm}>
+        <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={styles.input}>
+          <option value="">All Levels</option>
+          <option value="error">Error</option>
+          <option value="warn">Warning</option>
+          <option value="info">Info</option>
+          <option value="debug">Debug</option>
+          <option value="trace">Trace</option>
+        </select>
+        <input
+          type="text"
+          placeholder="Resource Type"
+          value={resourceTypeFilter}
+          onChange={(e) => setResourceTypeFilter(e.target.value)}
+          style={styles.input}
+        />
+        <input
+          type="text"
+          placeholder="Request ID"
+          value={reqIdFilter}
+          onChange={(e) => setReqIdFilter(e.target.value)}
+          style={styles.input}
+        />
+        <input
+          type="text"
+          placeholder="RPC Method"
+          value={rpcFilter}
+          onChange={(e) => setRpcFilter(e.target.value)}
+          style={styles.input}
+        />
+        <input
+          type="text"
+          placeholder="Message contains..."
+          value={messageFilter}
+          onChange={(e) => setMessageFilter(e.target.value)}
+          style={styles.input}
+        />
+        <input
+          type="datetime-local"
+          title="Start timestamp"
+          value={startTimestamp}
+          onChange={(e) => setStartTimestamp(e.target.value)}
+          style={styles.input}
+        />
+        <input
+          type="datetime-local"
+          title="End timestamp"
+          value={endTimestamp}
+          onChange={(e) => setEndTimestamp(e.target.value)}
+          style={styles.input}
+        />
+        <button type="submit" style={styles.button}>Apply Filters</button>
+      </form>
 
       {loading && <div style={styles.loading}>Loading logs...</div>}
       {error && <div style={styles.error}>{error}</div>}
 
       {!loading && logs.length === 0 && (
-        <div style={styles.noData}>No logs found. Upload a Terraform log file to get started.</div>
+        <div style={styles.noData}>No logs found. Upload a Terraform log file or adjust filters.</div>
       )}
 
       <div style={styles.logList}>
-        {logs.map((log) => (
-          <div key={log.id} style={styles.logEntry}>
-            <div style={styles.logHeader}>
-              <span
-                style={{
-                  ...styles.logLevel,
-                  backgroundColor: getLevelColor(log.log_level),
-                }}
-              >
-                {log.log_level || 'UNKNOWN'}
-              </span>
-              <span style={styles.timestamp}>{log.timestamp}</span>
-              <span style={styles.filename}>{log.filename}</span>
-            </div>
-            <div style={styles.logMessage}>{log.message}</div>
-            {log.raw_data && (
-              <details style={styles.details}>
-                <summary style={styles.summary}>Raw Data</summary>
-                <pre style={styles.rawData}>
-                  {JSON.stringify(log.raw_data, null, 2)}
-                </pre>
-              </details>
-            )}
-          </div>
+        {Object.entries(groupedLogs).map(([reqId, logGroup]) => (
+          <details key={reqId} style={styles.logGroup} open>
+            <summary style={styles.groupSummary}>
+              Request ID: {reqId} ({logGroup.length} entries)
+            </summary>
+            {logGroup.map((log) => (
+              <div key={log.id} style={styles.logEntry}>
+                <div style={styles.logHeader}>
+                  <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
+                    {log.log_level || 'UNKNOWN'}
+                  </span>
+                  <span style={styles.timestamp}>{log.timestamp}</span>
+                  <span style={styles.filename}>{log.filename}</span>
+                </div>
+                <div style={styles.logMessage}>{log.message}</div>
+                 {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
+                 {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
+                {log.raw_data && (
+                  <details style={styles.details}>
+                    <summary style={styles.summary}>Raw Data</summary>
+                    <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </details>
         ))}
       </div>
     </div>
@@ -97,97 +176,56 @@ function LogViewer({ refreshTrigger }) {
 }
 
 const styles = {
-  container: {
-    padding: '20px',
-  },
-  header: {
+  container: { padding: '20px' },
+  header: { marginBottom: '20px' },
+  filterForm: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  filterArea: {
-    display: 'flex',
-    alignItems: 'center',
     gap: '10px',
+    marginBottom: '20px',
+    flexWrap: 'wrap',
   },
-  select: {
+  input: {
     padding: '8px',
     borderRadius: '4px',
     border: '1px solid #ccc',
   },
-  loading: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#666',
-  },
-  error: {
-    padding: '10px',
-    backgroundColor: '#f8d7da',
-    color: '#721c24',
+  button: {
+    padding: '8px 15px',
     borderRadius: '4px',
-    marginBottom: '20px',
+    border: 'none',
+    backgroundColor: '#007bff',
+    color: 'white',
+    cursor: 'pointer',
   },
-  noData: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#666',
+  loading: { textAlign: 'center', padding: '20px', color: '#666' },
+  error: { padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px', marginBottom: '20px' },
+  noData: { textAlign: 'center', padding: '40px', color: '#666', backgroundColor: '#f5f5f5', borderRadius: '8px' },
+  logList: { display: 'flex', flexDirection: 'column', gap: '15px' },
+  logGroup: {
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+  },
+  groupSummary: {
+    padding: '10px',
+    cursor: 'pointer',
     backgroundColor: '#f5f5f5',
-    borderRadius: '8px',
-  },
-  logList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
+    fontWeight: 'bold',
   },
   logEntry: {
     backgroundColor: 'white',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
+    borderTop: '1px solid #eee',
     padding: '15px',
+    marginLeft: '20px'
   },
-  logHeader: {
-    display: 'flex',
-    gap: '10px',
-    alignItems: 'center',
-    marginBottom: '10px',
-  },
-  logLevel: {
-    padding: '4px 8px',
-    borderRadius: '4px',
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: '12px',
-    textTransform: 'uppercase',
-  },
-  timestamp: {
-    color: '#666',
-    fontSize: '14px',
-  },
-  filename: {
-    color: '#999',
-    fontSize: '12px',
-    marginLeft: 'auto',
-  },
-  logMessage: {
-    marginBottom: '10px',
-    lineHeight: '1.5',
-  },
-  details: {
-    marginTop: '10px',
-  },
-  summary: {
-    cursor: 'pointer',
-    color: '#007bff',
-    fontWeight: 'bold',
-  },
-  rawData: {
-    backgroundColor: '#f5f5f5',
-    padding: '10px',
-    borderRadius: '4px',
-    overflow: 'auto',
-    fontSize: '12px',
-  },
+  logHeader: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' },
+  logLevel: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase' },
+  timestamp: { color: '#666', fontSize: '14px' },
+  filename: { color: '#999', fontSize: '12px', marginLeft: 'auto' },
+  logMessage: { marginBottom: '10px', lineHeight: '1.5' },
+  metadata: { fontSize: '12px', color: '#555', marginBottom: '5px' },
+  details: { marginTop: '10px' },
+  summary: { cursor: 'pointer', color: '#007bff', fontWeight: 'bold' },
+  rawData: { backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '4px', overflow: 'auto', fontSize: '12px' },
 };
 
 export default LogViewer;

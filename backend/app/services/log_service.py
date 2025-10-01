@@ -166,9 +166,34 @@ def save_logs_to_db(db: Session, logs: list[dict], filename: str) -> int:
     return count
 
 
-def get_all_logs(db: Session, skip: int = 0, limit: int = 100):
-    """Get all logs from database."""
-    return db.query(TerraformLog).order_by(TerraformLog.uploaded_at.desc()).offset(skip).limit(limit).all()
+def get_all_logs(
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        tf_resource_type: str | None = None,
+        start_timestamp: str | None = None,
+        end_timestamp: str | None = None,
+        tf_req_id: str | None = None,
+        tf_rpc: str | None = None,
+        message_contains: str | None = None
+):
+    """Get all logs from database with optional filtering."""
+    query = db.query(TerraformLog)
+
+    if tf_resource_type:
+        query = query.filter(TerraformLog.tf_resource_type == tf_resource_type)
+    if start_timestamp:
+        query = query.filter(TerraformLog.timestamp >= start_timestamp)
+    if end_timestamp:
+        query = query.filter(TerraformLog.timestamp <= end_timestamp)
+    if tf_req_id:
+        query = query.filter(TerraformLog.tf_req_id == tf_req_id)
+    if tf_rpc:
+        query = query.filter(TerraformLog.tf_rpc == tf_rpc)
+    if message_contains:
+        query = query.filter(TerraformLog.message.contains(message_contains))
+
+    return query.order_by(TerraformLog.tf_req_id).offset(skip).limit(limit).all()
 
 
 def get_logs_by_level(db: Session, level: str):

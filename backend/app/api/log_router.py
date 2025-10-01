@@ -43,12 +43,28 @@ def get_logs(
         skip: int = Query(0, ge=0),
         limit: int = Query(100, ge=1, le=1000),
         level: Optional[str] = None,
+        tf_resource_type: Optional[str] = None,
+        start_timestamp: Optional[str] = None,
+        end_timestamp: Optional[str] = None,
+        tf_req_id: Optional[str] = None,
+        tf_rpc: Optional[str] = None,
+        message_contains: Optional[str] = None,
         db: Session = Depends(get_db)
 ):
     """Get logs from database with optional filtering."""
     if level:
         logs = get_logs_by_level(db, level)
     else:
-        logs = get_all_logs(db, skip, limit)
+        logs = get_all_logs(
+            db,
+            skip=skip,
+            limit=limit,
+            tf_resource_type=tf_resource_type,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
+            tf_req_id=tf_req_id,
+            tf_rpc=tf_rpc,
+            message_contains=message_contains
+        )
 
     return logs

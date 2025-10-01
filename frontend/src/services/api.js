@@ -15,11 +15,15 @@ export const uploadLogFile = async (file) => {
   return response.data;
 };
 
-export const getLogs = async (skip = 0, limit = 100, level = null) => {
-  const params = { skip, limit };
-  if (level) {
-    params.level = level;
-  }
+export const getLogs = async (skip = 0, limit = 100, options = {}) => {
+  const params = { skip, limit, ...options };
+
+  // Clean up null/undefined/empty string params
+  Object.keys(params).forEach(key => {
+    if (params[key] === null || params[key] === undefined || params[key] === '') {
+      delete params[key];
+    }
+  });
 
   const response = await axios.get(`${API_BASE_URL}/logs`, { params });
   return response.data;
