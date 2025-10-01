@@ -11,7 +11,8 @@ from app.services import (
     save_logs_to_db, 
     get_all_logs, 
     get_logs_by_level,
-    delete_all_logs
+    delete_all_logs,
+    get_gantt_data
 )
 
 router = APIRouter()
@@ -105,3 +106,10 @@ def clear_session(db: Session = Depends(get_db)):
         message="Session cleared successfully",
         deleted_count=count
     )
+
+
+@router.get("/gantt")
+def get_gantt_chart_data(db: Session = Depends(get_db)):
+    """Get aggregated request data for Gantt chart visualization."""
+    data = get_gantt_data(db)
+    return data
