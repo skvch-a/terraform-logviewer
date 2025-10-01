@@ -1,0 +1,8 @@
+{"@level":"info","@message":"Terraform 1.6.0","@module":"terraform.ui","@timestamp":"2024-01-15T10:00:00.000000Z","terraform":"1.6.0","type":"version","ui":"1.1"}
+{"@level":"info","@message":"Initializing the backend...","@module":"terraform.ui","@timestamp":"2024-01-15T10:00:01.000000Z","type":"init_output"}
+{"@level":"info","@message":"Initializing provider plugins...","@module":"terraform.ui","@timestamp":"2024-01-15T10:00:02.000000Z","type":"init_output"}
+{"@level":"info","@message":"- Reusing previous version of hashicorp/aws from the dependency lock file","@module":"terraform.ui","@timestamp":"2024-01-15T10:00:03.000000Z","type":"init_output"}
+{"@level":"info","@message":"- Using previously-installed hashicorp/aws v5.0.0","@module":"terraform.ui","@timestamp":"2024-01-15T10:00:04.000000Z","type":"init_output"}
+{"@message":"Uh, oh, i lost the log level","@module":"terraform.ui","@timestamp":"2024-01-15T10:00:05.000000Z","type":"init_output"}
+{"@message":"here is no timestamp, what's gonna happen?","@module":"terraform.ui","type":"init_output"}
+{"@message":"ERROR: file not found","@module":"terraform.ui","type":"init_output"}

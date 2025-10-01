@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models import TerraformLog
 
+from app.services.log_fixing import fix_log_sequence
+
 
 class SectionType(Enum):
     """Типы секций Terraform."""
@@ -139,7 +141,7 @@ def parse_terraform_log(content: str) -> list[dict]:
                 except json.JSONDecodeError:
                     continue
 
-    return logs
+    return fix_log_sequence(logs)
 
 
 def save_logs_to_db(db: Session, logs: list[dict], filename: str) -> int:
