@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getLogs } from '../services/api';
 
 function LogViewer({ refreshTrigger }) {
@@ -17,7 +17,7 @@ function LogViewer({ refreshTrigger }) {
   const [messageFilter, setMessageFilter] = useState('');
 
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -38,7 +38,7 @@ function LogViewer({ refreshTrigger }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter]);
 
   // Group logs by tf_req_id
   useEffect(() => {
@@ -56,7 +56,7 @@ function LogViewer({ refreshTrigger }) {
 
   useEffect(() => {
     fetchLogs();
-  }, [refreshTrigger, fetchLogs]);
+  }, [refreshTrigger, levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter]);
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
