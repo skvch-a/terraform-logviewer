@@ -49,27 +49,6 @@ async def upload_log_file(
         fixed_logs_count=fixed_count
     )
 
-
-@router.post("/logs/sections", response_model=LogWithSectionsResponse)
-async def parse_log_with_sections(
-        file: UploadFile = File(...),
-):
-    """Parse Terraform JSON log file with sections without saving to database."""
-    if not file.filename.endswith(('.json', '.log')):
-        raise HTTPException(status_code=400, detail="Only JSON files are supported")
-
-    content = await file.read()
-    content_str = content.decode('utf-8')
-
-    # Parse the log file with sections
-    result = parse_terraform_log_with_sections(content_str, file.filename)
-
-    if not result or not result.get('logs'):
-        raise HTTPException(status_code=400, detail="No valid log entries found in the file")
-
-    return result
-
-
 @router.get("/logs", response_model=List[LogEntry])
 def get_logs(
         skip: int = Query(0, ge=0),

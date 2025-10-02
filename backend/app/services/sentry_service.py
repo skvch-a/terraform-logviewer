@@ -1,6 +1,6 @@
 import sentry_sdk
-from typing import List
 from sqlalchemy.orm import Session
+
 from app.models import TerraformLog
 
 
@@ -11,29 +11,25 @@ def send_error_logs_to_sentry(db: Session, dsn: str) -> dict:
     Args:
         db: Database session
         dsn: Sentry DSN (Data Source Name)
-    
-    Returns:
-        dict with status information
     """
     # Initialize Sentry with provided DSN
     sentry_sdk.init(
         dsn=dsn,
-        traces_sample_rate=0.0,  # No performance tracking needed
+        traces_sample_rate=0.0,
     )
-    
+
     # Query all ERROR level logs
     error_logs = db.query(TerraformLog).filter(
         TerraformLog.log_level.ilike('error')
     ).all()
-    
+
     if not error_logs:
         return {
             "status": "success",
             "message": "No ERROR logs found",
             "count": 0
         }
-    
-    # Send each error log to Sentry
+
     sent_count = 0
     for log in error_logs:
         try:
@@ -49,7 +45,7 @@ def send_error_logs_to_sentry(db: Session, dsn: str) -> dict:
                     "caller": log.caller,
                     "module": log.module,
                 })
-                
+
                 # Add tags for easier filtering in Sentry
                 if log.tf_resource_type:
                     scope.set_tag("resource_type", log.tf_resource_type)
@@ -57,10 +53,10 @@ def send_error_logs_to_sentry(db: Session, dsn: str) -> dict:
                     scope.set_tag("rpc", log.tf_rpc)
                 if log.tf_req_id:
                     scope.set_tag("request_id", log.tf_req_id)
-                
+
                 scope.set_tag("log_level", "ERROR")
                 scope.set_tag("filename", log.filename)
-                
+
                 # Send the message to Sentry
                 sentry_sdk.capture_message(
                     log.message or "No message",
@@ -68,12 +64,10 @@ def send_error_logs_to_sentry(db: Session, dsn: str) -> dict:
                 )
                 sent_count += 1
         except Exception as e:
-            # Log but don't fail if one log fails to send
             print(f"Failed to send log {log.id} to Sentry: {e}")
-    
-    # Flush to ensure all events are sent
+
     sentry_sdk.flush(timeout=10)
-    
+
     return {
         "status": "success",
         "message": f"Sent {sent_count} ERROR logs to Sentry",
