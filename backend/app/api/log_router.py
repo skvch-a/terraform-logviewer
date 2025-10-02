@@ -12,7 +12,8 @@ from app.services import (
     get_all_logs, 
     get_logs_by_level,
     delete_all_logs,
-    get_gantt_data
+    get_gantt_data,
+    get_sections_from_db
 )
 
 router = APIRouter()
@@ -113,4 +114,11 @@ def clear_session(db: Session = Depends(get_db)):
 def get_gantt_chart_data(db: Session = Depends(get_db)):
     """Get aggregated request data for Gantt chart visualization."""
     data = get_gantt_data(db)
+    return data
+
+
+@router.get("/sections", response_model=LogWithSectionsResponse)
+def get_sections_data(db: Session = Depends(get_db)):
+    """Get sections data from database logs."""
+    data = get_sections_from_db(db)
     return data

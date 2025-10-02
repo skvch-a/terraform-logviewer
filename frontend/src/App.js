@@ -45,7 +45,10 @@ function App() {
             <LogViewer refreshTrigger={refreshTrigger} />
           </>
         ) : viewMode === 'sections' ? (
-          <SectionsView />
+          <>
+            <FileUpload onUploadSuccess={handleUploadSuccess} />
+            <SectionsView refreshTrigger={refreshTrigger} />
+          </>
         ) : (
           <>
             <FileUpload onUploadSuccess={handleUploadSuccess} />

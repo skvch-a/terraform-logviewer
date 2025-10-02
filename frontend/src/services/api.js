@@ -51,3 +51,8 @@ export const getGanttData = async () => {
   const response = await axios.get(`${API_BASE_URL}/gantt`);
   return response.data;
 };
+
+export const getSectionsData = async () => {
+  const response = await axios.get(`${API_BASE_URL}/sections`);
+  return response.data;
+};

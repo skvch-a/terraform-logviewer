@@ -5,7 +5,8 @@ from .log_service import (
     get_all_logs, 
     get_logs_by_level,
     delete_all_logs,
-    get_gantt_data
+    get_gantt_data,
+    get_sections_from_db
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     'get_all_logs', 
     'get_logs_by_level',
     'delete_all_logs',
-    'get_gantt_data'
+    'get_gantt_data',
+    'get_sections_from_db'
 ]
