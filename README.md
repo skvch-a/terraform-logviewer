@@ -130,3 +130,8 @@ docker-compose down -v
 {"@level": "info", "@message": "Terraform init", "@timestamp": "2024-01-01T12:00:00Z"}
 {"@level": "error", "@message": "Failed to initialize", "@timestamp": "2024-01-01T12:00:01Z"}
 ```
+
+### Использовагие с Sentry
+Поместите свой API ключ Sentry в файл `.env`, по примеру .env.example:
+```bash
+SENTRY_DSN=YOUR_SENTRY_DSN_KEY
