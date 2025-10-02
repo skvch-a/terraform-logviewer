@@ -87,6 +87,8 @@ docker-compose down -v
 - Debug - отладочные сообщения
 - Trace - трассировочные сообщения
 
+**Также можно отмечать логи как прочитаные, при нажатии на зелёную кнопку**
+
 ### Диаграмма Ганта (Gantt Chart)
 
 Новая функция визуализации хронологии запросов:
@@ -130,3 +132,10 @@ docker-compose down -v
 {"@level": "info", "@message": "Terraform init", "@timestamp": "2024-01-01T12:00:00Z"}
 {"@level": "error", "@message": "Failed to initialize", "@timestamp": "2024-01-01T12:00:01Z"}
 ```
+
+### Использовагие с Sentry
+Поместите свой API ключ Sentry в файл `.env`, по примеру .env.example:
+```bash
+SENTRY_DSN=YOUR_SENTRY_DSN_KEY
+```
+Логи будут подгружены на сервис при нажатии кнопки "Send Errors to Sentry".
