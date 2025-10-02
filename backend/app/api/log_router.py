@@ -124,3 +124,63 @@ def get_sections_data(db: Session = Depends(get_db)):
     """Get sections data from database logs."""
     data = get_sections_from_db(db)
     return data
+
+
+@router.get("/request-ids")
+def get_request_ids(db: Session = Depends(get_db)):
+    """Get list of unique request IDs with basic metadata."""
+    from sqlalchemy import func
+    
+    # Get unique request IDs with count
+    result = (
+        db.query(
+            TerraformLog.tf_req_id,
+            func.count(TerraformLog.id).label('log_count'),
+            func.min(TerraformLog.timestamp).label('start_timestamp'),
+            func.max(TerraformLog.timestamp).label('end_timestamp')
+        )
+        .filter(TerraformLog.tf_req_id.isnot(None))
+        .group_by(TerraformLog.tf_req_id)
+        .order_by(func.min(TerraformLog.timestamp))
+        .all()
+    )
+    
+    # Also get logs without request_id
+    no_req_id_count = db.query(func.count(TerraformLog.id)).filter(
+        TerraformLog.tf_req_id.is_(None)
+    ).scalar()
+    
+    request_ids = [
+        {
+            'tf_req_id': row.tf_req_id,
+            'log_count': row.log_count,
+            'start_timestamp': row.start_timestamp,
+            'end_timestamp': row.end_timestamp
+        }
+        for row in result
+    ]
+    
+    # Add no-request-id group if exists
+    if no_req_id_count > 0:
+        request_ids.append({
+            'tf_req_id': 'no-request-id',
+            'log_count': no_req_id_count,
+            'start_timestamp': None,
+            'end_timestamp': None
+        })
+    
+    return request_ids
+
+
+@router.get("/logs/by-request/{request_id}", response_model=List[LogEntry])
+def get_logs_by_request_id(
+        request_id: str,
+        db: Session = Depends(get_db)
+):
+    """Get all logs for a specific request ID."""
+    if request_id == 'no-request-id':
+        logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id.is_(None)).order_by(TerraformLog.timestamp).all()
+    else:
+        logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id == request_id).order_by(TerraformLog.timestamp).all()
+    
+    return logs

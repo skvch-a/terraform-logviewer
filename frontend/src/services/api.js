@@ -56,3 +56,13 @@ export const getSectionsData = async () => {
   const response = await axios.get(`${API_BASE_URL}/sections`);
   return response.data;
 };
+
+export const getRequestIds = async () => {
+  const response = await axios.get(`${API_BASE_URL}/request-ids`);
+  return response.data;
+};
+
+export const getLogsByRequestId = async (requestId) => {
+  const response = await axios.get(`${API_BASE_URL}/logs/by-request/${requestId}`);
+  return response.data;
+};
