@@ -16,7 +16,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Terraform Log Viewer</h1>
+        <h1>Terraform LogViewer</h1>
         <div style={styles.viewToggle}>
           <button 
             style={{...styles.toggleButton, ...(viewMode === 'logs' ? styles.activeButton : {})}}

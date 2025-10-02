@@ -190,10 +190,6 @@ function LogViewer({ refreshTrigger }) {
       {loading && <div style={styles.loading}>Loading logs...</div>}
       {error && <div style={styles.error}>{error}</div>}
 
-      {!loading && logs.length === 0 && (
-        <div style={styles.noData}>No logs found. Upload a Terraform log file or adjust filters.</div>
-      )}
-
       <div style={styles.logList}>
         {groupByRequestId ? (
           requestIds.length > 0 ? (
