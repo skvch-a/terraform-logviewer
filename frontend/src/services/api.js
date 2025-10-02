@@ -66,3 +66,8 @@ export const getLogsByRequestId = async (requestId) => {
   const response = await axios.get(`${API_BASE_URL}/logs/by-request/${requestId}`);
   return response.data;
 };
+
+export const sendErrorsToSentry = async () => {
+  const response = await axios.post(`${API_BASE_URL}/sentry/send-errors`);
+  return response.data;
+};
