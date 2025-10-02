@@ -23,7 +23,11 @@ function FileUpload({ onUploadSuccess }) {
 
     try {
       const result = await uploadLogFile(file);
-      setMessage(`Success! Uploaded ${result.entries_count} log entries from ${result.filename}`);
+      let msg = `Success! Uploaded ${result.entries_count} log entries from ${result.filename}`;
+      if (result.fixed_logs_count > 0) {
+        msg += ` ⚠️ Warning: ${result.fixed_logs_count} log entries had missing fields that were automatically restored.`;
+      }
+      setMessage(msg);
       setFile(null);
       if (onUploadSuccess) {
         onUploadSuccess();

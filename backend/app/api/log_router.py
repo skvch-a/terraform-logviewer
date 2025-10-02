@@ -12,7 +12,8 @@ from app.services import (
     get_all_logs, 
     get_logs_by_level,
     delete_all_logs,
-    get_gantt_data
+    get_gantt_data,
+    get_sections_from_db
 )
 
 router = APIRouter()
@@ -31,7 +32,7 @@ async def upload_log_file(
     content_str = content.decode('utf-8')
 
     # Parse the log file
-    logs = parse_terraform_log(content_str)
+    logs, fixed_count = parse_terraform_log(content_str)
 
     if not logs:
         raise HTTPException(status_code=400, detail="No valid log entries found in the file")
@@ -42,7 +43,8 @@ async def upload_log_file(
     return LogUploadResponse(
         message="File uploaded successfully",
         entries_count=count,
-        filename=file.filename
+        filename=file.filename,
+        fixed_logs_count=fixed_count
     )
 
 
@@ -77,9 +79,10 @@ def get_logs(
         tf_req_id: Optional[str] = None,
         tf_rpc: Optional[str] = None,
         message_contains: Optional[str] = None,
+        group_by_request_id: bool = Query(True, description="Group logs by request_id"),
         db: Session = Depends(get_db)
 ):
-    """Get logs from database with optional filtering."""
+    """Get logs from database with optional filtering and grouping."""
     if level:
         logs = get_logs_by_level(db, level)
     else:
@@ -92,7 +95,8 @@ def get_logs(
             end_timestamp=end_timestamp,
             tf_req_id=tf_req_id,
             tf_rpc=tf_rpc,
-            message_contains=message_contains
+            message_contains=message_contains,
+            group_by_request_id=group_by_request_id
         )
 
     return logs
@@ -113,3 +117,70 @@ def get_gantt_chart_data(db: Session = Depends(get_db)):
     """Get aggregated request data for Gantt chart visualization."""
     data = get_gantt_data(db)
     return data
+
+
+@router.get("/sections", response_model=LogWithSectionsResponse)
+def get_sections_data(db: Session = Depends(get_db)):
+    """Get sections data from database logs."""
+    data = get_sections_from_db(db)
+    return data
+
+
+@router.get("/request-ids")
+def get_request_ids(db: Session = Depends(get_db)):
+    """Get list of unique request IDs with basic metadata."""
+    from sqlalchemy import func
+    
+    # Get unique request IDs with count
+    result = (
+        db.query(
+            TerraformLog.tf_req_id,
+            func.count(TerraformLog.id).label('log_count'),
+            func.min(TerraformLog.timestamp).label('start_timestamp'),
+            func.max(TerraformLog.timestamp).label('end_timestamp')
+        )
+        .filter(TerraformLog.tf_req_id.isnot(None))
+        .group_by(TerraformLog.tf_req_id)
+        .order_by(func.min(TerraformLog.timestamp))
+        .all()
+    )
+    
+    # Also get logs without request_id
+    no_req_id_count = db.query(func.count(TerraformLog.id)).filter(
+        TerraformLog.tf_req_id.is_(None)
+    ).scalar()
+    
+    request_ids = [
+        {
+            'tf_req_id': row.tf_req_id,
+            'log_count': row.log_count,
+            'start_timestamp': row.start_timestamp,
+            'end_timestamp': row.end_timestamp
+        }
+        for row in result
+    ]
+    
+    # Add no-request-id group if exists
+    if no_req_id_count > 0:
+        request_ids.append({
+            'tf_req_id': 'no-request-id',
+            'log_count': no_req_id_count,
+            'start_timestamp': None,
+            'end_timestamp': None
+        })
+    
+    return request_ids
+
+
+@router.get("/logs/by-request/{request_id}", response_model=List[LogEntry])
+def get_logs_by_request_id(
+        request_id: str,
+        db: Session = Depends(get_db)
+):
+    """Get all logs for a specific request ID."""
+    if request_id == 'no-request-id':
+        logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id.is_(None)).order_by(TerraformLog.timestamp).all()
+    else:
+        logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id == request_id).order_by(TerraformLog.timestamp).all()
+    
+    return logs

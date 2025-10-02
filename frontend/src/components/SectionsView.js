@@ -1,38 +1,39 @@
-import React, { useState } from 'react';
-import { parseLogWithSections } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { getSectionsData } from '../services/api';
 
-function SectionsView() {
-  const [file, setFile] = useState(null);
+function SectionsView({ refreshTrigger }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [sectionsData, setSectionsData] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-    setMessage('');
-    setSectionsData(null);
-  };
+  useEffect(() => {
+    fetchSectionsData();
+  }, [refreshTrigger]);
 
-  const handleParse = async () => {
-    if (!file) {
-      setMessage('Please select a file first');
-      return;
-    }
-
+  const fetchSectionsData = async () => {
     setLoading(true);
     setMessage('');
 
     try {
-      const result = await parseLogWithSections(file);
-      setSectionsData(result);
-      setMessage(`Successfully parsed ${result.total_logs} logs with ${result.sections.length} sections`);
-      // Expand all sections by default
-      const expanded = {};
-      result.sections.forEach((_, idx) => {
-        expanded[idx] = true;
-      });
-      setExpandedSections(expanded);
+      const result = await getSectionsData();
+      if (result.total_logs === 0) {
+        setMessage('No logs found in database. Please upload a log file first.');
+        setSectionsData(null);
+      } else {
+        setSectionsData(result);
+        let msg = `Successfully loaded ${result.total_logs} logs with ${result.sections.length} sections`;
+        if (result.fixed_logs_count > 0) {
+          msg += ` ⚠️ Warning: ${result.fixed_logs_count} log entries had missing fields that were automatically restored.`;
+        }
+        setMessage(msg);
+        // Expand all sections by default
+        const expanded = {};
+        result.sections.forEach((_, idx) => {
+          expanded[idx] = true;
+        });
+        setExpandedSections(expanded);
+      }
     } catch (error) {
       setMessage(`Error: ${error.response?.data?.detail || error.message}`);
       setSectionsData(null);
@@ -92,27 +93,21 @@ function SectionsView() {
     <div style={styles.container}>
       <h2>Terraform Sections Parser</h2>
       <p style={styles.description}>
-        Parse Terraform logs to see organized sections (plan, apply, init)
+        View organized sections (plan, apply, init) from database logs
       </p>
       
-      <div style={styles.uploadArea}>
-        <input
-          type="file"
-          accept=".json,.log"
-          onChange={handleFileChange}
-          style={styles.fileInput}
-        />
+      <div style={styles.controls}>
         <button
-          onClick={handleParse}
+          onClick={fetchSectionsData}
           disabled={loading}
-          style={styles.parseButton}
+          style={styles.refreshButton}
         >
-          {loading ? 'Parsing...' : 'Parse Sections'}
+          {loading ? 'Loading...' : 'Refresh Data'}
         </button>
       </div>
 
       {message && (
-        <div style={message.startsWith('Success') ? styles.successMessage : styles.errorMessage}>
+        <div style={message.startsWith('Success') || message.startsWith('No logs') ? styles.successMessage : styles.errorMessage}>
           {message}
         </div>
       )}
@@ -192,19 +187,12 @@ const styles = {
     color: '#666',
     marginBottom: '15px',
   },
-  uploadArea: {
-    display: 'flex',
-    gap: '10px',
-    alignItems: 'center',
+  controls: {
     marginBottom: '20px',
   },
-  fileInput: {
-    flex: 1,
-    padding: '8px',
-  },
-  parseButton: {
+  refreshButton: {
     padding: '10px 20px',
-    backgroundColor: '#28a745',
+    backgroundColor: '#007bff',
     color: 'white',
     border: 'none',
     borderRadius: '4px',

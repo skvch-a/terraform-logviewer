@@ -57,7 +57,7 @@ def parse_terraform_log_with_sections(content: str, filename: str) -> dict:
 
     Возвращает словарь с информацией о секциях и логах.
     """
-    logs = parse_terraform_log(content)
+    logs, fixed_count = parse_terraform_log(content)
 
     # Анализ секций
     sections = []
@@ -109,12 +109,18 @@ def parse_terraform_log_with_sections(content: str, filename: str) -> dict:
             for section in sections
         ],
         'filename': filename,
-        'total_logs': len(logs)
+        'total_logs': len(logs),
+        'fixed_logs_count': fixed_count
     }
 
 
-def parse_terraform_log(content: str) -> list[dict]:
-    """Parse Terraform JSON log file."""
+def parse_terraform_log(content: str) -> tuple[list[dict], int]:
+    """
+    Parse Terraform JSON log file.
+    
+    Returns:
+        tuple: (parsed_logs, count_of_fixed_entries)
+    """
     logs = []
 
     # Try to parse as JSON array first
@@ -170,7 +176,8 @@ def get_all_logs(
         end_timestamp: str | None = None,
         tf_req_id: str | None = None,
         tf_rpc: str | None = None,
-        message_contains: str | None = None
+        message_contains: str | None = None,
+        group_by_request_id: bool = True
 ):
     """Get all logs from database with optional filtering."""
     query = db.query(TerraformLog)
@@ -188,7 +195,11 @@ def get_all_logs(
     if message_contains:
         query = query.filter(TerraformLog.message.contains(message_contains))
 
-    return query.order_by(TerraformLog.tf_req_id).offset(skip).limit(limit).all()
+    # Order by request_id if grouping is enabled, otherwise by timestamp
+    if group_by_request_id:
+        return query.order_by(TerraformLog.tf_req_id, TerraformLog.timestamp).offset(skip).limit(limit).all()
+    else:
+        return query.order_by(TerraformLog.timestamp).offset(skip).limit(limit).all()
 
 
 def get_logs_by_level(db: Session, level: str):
@@ -248,4 +259,95 @@ def get_gantt_data(db: Session) -> list[dict]:
     gantt_data.sort(key=lambda x: x['start_timestamp'] or '')
 
     return gantt_data
+
+
+def get_sections_from_db(db: Session) -> dict:
+    """
+    Get sections data from database logs.
+    Similar to parse_terraform_log_with_sections but works from DB.
+    """
+    # Get all logs from database
+    logs_query = db.query(TerraformLog).order_by(TerraformLog.id).all()
+    
+    if not logs_query:
+        return {
+            'logs': [],
+            'sections': [],
+            'filename': '',
+            'total_logs': 0,
+            'fixed_logs_count': 0
+        }
+    
+    # Convert DB logs to dict format similar to JSON logs
+    logs = []
+    for log in logs_query:
+        log_dict = {
+            '@level': log.log_level,
+            '@timestamp': log.timestamp,
+            '@message': log.message,
+            'level': log.log_level,
+            'timestamp': log.timestamp,
+            'message': log.message,
+        }
+        # Add raw_data if available
+        if log.raw_data:
+            log_dict.update(log.raw_data)
+        logs.append(log_dict)
+    
+    # Analyze sections using the same logic as parse_terraform_log_with_sections
+    sections = []
+    current_section: LogSection | None = None
+
+    for idx, log_entry in enumerate(logs):
+        start_section, end_section = detect_section_markers(log_entry)
+
+        # Start of new section
+        if start_section:
+            # Close previous section if open
+            if current_section and current_section.end_index is None:
+                current_section.end_index = idx - 1
+                sections.append(current_section)
+
+            current_section = LogSection(start_section, idx)
+            current_section.logs.append(log_entry)
+
+        # End of current section
+        elif end_section and current_section:
+            if current_section.section_type.value == end_section.value:
+                current_section.logs.append(log_entry)
+                current_section.end_index = idx
+                sections.append(current_section)
+                current_section = None
+
+        # Continue current section
+        elif current_section:
+            current_section.logs.append(log_entry)
+
+    # Close last section if still open
+    if current_section and current_section.end_index is None:
+        current_section.end_index = len(logs) - 1
+        sections.append(current_section)
+
+    # Get filename from first log
+    filename = logs_query[0].filename if logs_query else ''
+
+    return {
+        'logs': logs,
+        'sections': [
+            {
+                'type': section.section_type.value,
+                'start_index': section.start_index,
+                'end_index': section.end_index,
+                'log_count': len(section.logs),
+                'start_timestamp': section.logs[0].get('@timestamp') or section.logs[0].get(
+                    'timestamp') if section.logs else None,
+                'end_timestamp': section.logs[-1].get('@timestamp') or section.logs[-1].get(
+                    'timestamp') if section.logs else None
+            }
+            for section in sections
+        ],
+        'filename': filename,
+        'total_logs': len(logs),
+        'fixed_logs_count': 0  # DB logs are already processed
+    }
 

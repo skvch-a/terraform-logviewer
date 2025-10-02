@@ -27,6 +27,7 @@ class LogUploadResponse(BaseModel):
     message: str
     entries_count: int
     filename: str
+    fixed_logs_count: int = 0
 
 
 class SectionInfo(BaseModel):
@@ -43,6 +44,7 @@ class LogWithSectionsResponse(BaseModel):
     sections: List[SectionInfo]
     filename: str
     total_logs: int
+    fixed_logs_count: int = 0
 
 
 class DeleteResponse(BaseModel):
