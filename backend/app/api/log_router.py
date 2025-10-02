@@ -79,9 +79,10 @@ def get_logs(
         tf_req_id: Optional[str] = None,
         tf_rpc: Optional[str] = None,
         message_contains: Optional[str] = None,
+        group_by_request_id: bool = Query(True, description="Group logs by request_id"),
         db: Session = Depends(get_db)
 ):
-    """Get logs from database with optional filtering."""
+    """Get logs from database with optional filtering and grouping."""
     if level:
         logs = get_logs_by_level(db, level)
     else:
@@ -94,7 +95,8 @@ def get_logs(
             end_timestamp=end_timestamp,
             tf_req_id=tf_req_id,
             tf_rpc=tf_rpc,
-            message_contains=message_contains
+            message_contains=message_contains,
+            group_by_request_id=group_by_request_id
         )
 
     return logs

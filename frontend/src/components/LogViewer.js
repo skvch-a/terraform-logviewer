@@ -6,6 +6,7 @@ function LogViewer({ refreshTrigger }) {
   const [groupedLogs, setGroupedLogs] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [groupByRequestId, setGroupByRequestId] = useState(true);
 
   // State for filters
   const [levelFilter, setLevelFilter] = useState('');
@@ -30,6 +31,7 @@ function LogViewer({ refreshTrigger }) {
         tf_req_id: reqIdFilter,
         tf_rpc: rpcFilter,
         message_contains: messageFilter,
+        group_by_request_id: groupByRequestId,
       };
       const data = await getLogs(0, 1000, filterOptions); // Increased limit for better grouping
       setLogs(data);
@@ -38,25 +40,29 @@ function LogViewer({ refreshTrigger }) {
     } finally {
       setLoading(false);
     }
-  }, [levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter]);
+  }, [levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter, groupByRequestId]);
 
-  // Group logs by tf_req_id
+  // Group logs by tf_req_id (only if grouping is enabled)
   useEffect(() => {
-    const groups = logs.reduce((acc, log) => {
-      const key = log.tf_req_id || 'no-request-id';
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(log);
-      return acc;
-    }, {});
-    setGroupedLogs(groups);
-  }, [logs]);
+    if (groupByRequestId) {
+      const groups = logs.reduce((acc, log) => {
+        const key = log.tf_req_id || 'no-request-id';
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(log);
+        return acc;
+      }, {});
+      setGroupedLogs(groups);
+    } else {
+      setGroupedLogs({});
+    }
+  }, [logs, groupByRequestId]);
 
 
   useEffect(() => {
     fetchLogs();
-  }, [refreshTrigger, levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter, fetchLogs]);
+  }, [refreshTrigger, levelFilter, resourceTypeFilter, startTimestamp, endTimestamp, reqIdFilter, rpcFilter, messageFilter, groupByRequestId, fetchLogs]);
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
@@ -79,6 +85,12 @@ function LogViewer({ refreshTrigger }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2>Terraform Logs</h2>
+        <button 
+          onClick={() => setGroupByRequestId(!groupByRequestId)}
+          style={styles.groupToggleButton}
+        >
+          {groupByRequestId ? '📋 Disable Grouping' : '📋 Enable Grouping'}
+        </button>
       </div>
 
       <form onSubmit={handleFilterSubmit} style={styles.filterForm}>
@@ -143,33 +155,59 @@ function LogViewer({ refreshTrigger }) {
       )}
 
       <div style={styles.logList}>
-        {Object.entries(groupedLogs).map(([reqId, logGroup]) => (
-          <details key={reqId} style={styles.logGroup} open>
-            <summary style={styles.groupSummary}>
-              Request ID: {reqId} ({logGroup.length} entries)
-            </summary>
-            {logGroup.map((log) => (
-              <div key={log.id} style={styles.logEntry}>
-                <div style={styles.logHeader}>
-                  <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
-                    {log.log_level || 'UNKNOWN'}
-                  </span>
-                  <span style={styles.timestamp}>{log.timestamp}</span>
-                  <span style={styles.filename}>{log.filename}</span>
+        {groupByRequestId ? (
+          // Grouped view
+          Object.entries(groupedLogs).map(([reqId, logGroup]) => (
+            <details key={reqId} style={styles.logGroup} open>
+              <summary style={styles.groupSummary}>
+                Request ID: {reqId} ({logGroup.length} entries)
+              </summary>
+              {logGroup.map((log) => (
+                <div key={log.id} style={styles.logEntry}>
+                  <div style={styles.logHeader}>
+                    <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
+                      {log.log_level || 'UNKNOWN'}
+                    </span>
+                    <span style={styles.timestamp}>{log.timestamp}</span>
+                    <span style={styles.filename}>{log.filename}</span>
+                  </div>
+                  <div style={styles.logMessage}>{log.message}</div>
+                   {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
+                   {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
+                  {log.raw_data && (
+                    <details style={styles.details}>
+                      <summary style={styles.summary}>Raw Data</summary>
+                      <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
+                    </details>
+                  )}
                 </div>
-                <div style={styles.logMessage}>{log.message}</div>
-                 {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
-                 {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
-                {log.raw_data && (
-                  <details style={styles.details}>
-                    <summary style={styles.summary}>Raw Data</summary>
-                    <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
-                  </details>
-                )}
+              ))}
+            </details>
+          ))
+        ) : (
+          // Flat view
+          logs.map((log) => (
+            <div key={log.id} style={styles.logEntryFlat}>
+              <div style={styles.logHeader}>
+                <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
+                  {log.log_level || 'UNKNOWN'}
+                </span>
+                <span style={styles.timestamp}>{log.timestamp}</span>
+                <span style={styles.filename}>{log.filename}</span>
+                {log.tf_req_id && <span style={styles.reqId}>Request ID: {log.tf_req_id}</span>}
               </div>
-            ))}
-          </details>
-        ))}
+              <div style={styles.logMessage}>{log.message}</div>
+               {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
+               {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
+              {log.raw_data && (
+                <details style={styles.details}>
+                  <summary style={styles.summary}>Raw Data</summary>
+                  <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
+                </details>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -177,7 +215,21 @@ function LogViewer({ refreshTrigger }) {
 
 const styles = {
   container: { padding: '20px' },
-  header: { marginBottom: '20px' },
+  header: { 
+    marginBottom: '20px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  groupToggleButton: {
+    padding: '8px 15px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: '#6c757d',
+    color: 'white',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
   filterForm: {
     display: 'flex',
     gap: '10px',
@@ -217,10 +269,17 @@ const styles = {
     padding: '15px',
     marginLeft: '20px'
   },
-  logHeader: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' },
+  logEntryFlat: {
+    backgroundColor: 'white',
+    border: '1px solid #eee',
+    borderRadius: '4px',
+    padding: '15px',
+  },
+  logHeader: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' },
   logLevel: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase' },
   timestamp: { color: '#666', fontSize: '14px' },
   filename: { color: '#999', fontSize: '12px', marginLeft: 'auto' },
+  reqId: { color: '#007bff', fontSize: '12px', fontWeight: 'bold' },
   logMessage: { marginBottom: '10px', lineHeight: '1.5' },
   metadata: { fontSize: '12px', color: '#555', marginBottom: '5px' },
   details: { marginTop: '10px' },

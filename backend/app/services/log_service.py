@@ -176,7 +176,8 @@ def get_all_logs(
         end_timestamp: str | None = None,
         tf_req_id: str | None = None,
         tf_rpc: str | None = None,
-        message_contains: str | None = None
+        message_contains: str | None = None,
+        group_by_request_id: bool = True
 ):
     """Get all logs from database with optional filtering."""
     query = db.query(TerraformLog)
@@ -194,7 +195,11 @@ def get_all_logs(
     if message_contains:
         query = query.filter(TerraformLog.message.contains(message_contains))
 
-    return query.order_by(TerraformLog.tf_req_id).offset(skip).limit(limit).all()
+    # Order by request_id if grouping is enabled, otherwise by timestamp
+    if group_by_request_id:
+        return query.order_by(TerraformLog.tf_req_id, TerraformLog.timestamp).offset(skip).limit(limit).all()
+    else:
+        return query.order_by(TerraformLog.timestamp).offset(skip).limit(limit).all()
 
 
 def get_logs_by_level(db: Session, level: str):
