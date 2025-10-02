@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package logplugin;
+
+// Service for log processing plugins
+service LogPlugin {
+  // Process logs and return results
+  rpc ProcessLogs (LogRequest) returns (LogResponse);
+}
+
+// Log entry structure
+message LogEntry {
+  string level = 1;
+  string timestamp = 2;
+  string message = 3;
+  string tf_req_id = 4;
+  string tf_rpc = 5;
+  string tf_resource_type = 6;
+  string raw_json = 7;
+}
+
+// Request with logs to process
+message LogRequest {
+  repeated LogEntry logs = 1;
+  map<string, string> options = 2;
+}
+
+// Response from plugin
+message LogResponse {
+  repeated ProcessedResult results = 1;
+  string summary = 2;
+}
+
+// Processed result from plugin
+message ProcessedResult {
+  string key = 1;
+  string value = 2;
+  int32 count = 3;
+  repeated string log_ids = 4;
+}

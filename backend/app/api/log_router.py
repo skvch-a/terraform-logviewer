@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from app.services import (
     get_sections_from_db,
     send_error_logs_to_sentry
 )
+from app.plugins.plugin_manager import plugin_manager
 
 router = APIRouter()
 
@@ -175,3 +176,42 @@ def send_errors_to_sentry(db: Session = Depends(get_db)):
     
     result = send_error_logs_to_sentry(db, sentry_dsn)
     return result
+
+
+@router.post("/plugins/register")
+def register_plugin(name: str, address: str):
+    """Register a new plugin."""
+    plugin_manager.register_plugin(name, address)
+    return {"message": f"Plugin '{name}' registered at {address}"}
+
+
+@router.get("/plugins/list")
+def list_plugins():
+    """List all registered plugins."""
+    return {"plugins": plugin_manager.list_plugins()}
+
+
+@router.post("/plugins/process")
+def process_with_plugin(
+    plugin_name: str,
+    level: Optional[str] = None,
+    limit: int = Query(1000, ge=1, le=10000),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Process logs with a registered plugin."""
+    # Get logs to process
+    if level:
+        logs = get_logs_by_level(db, level)
+    else:
+        logs = get_all_logs(db, skip=0, limit=limit)
+    
+    if not logs:
+        raise HTTPException(status_code=404, detail="No logs found")
+    
+    try:
+        result = plugin_manager.process_logs_with_plugin(plugin_name, logs)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
