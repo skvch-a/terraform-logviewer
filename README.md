@@ -1,4 +1,4 @@
-# Terraform Log Viewer
+# Terraform LogViewer
 
 Веб-сервис для просмотра и анализа логов Terraform в формате JSON.
 
