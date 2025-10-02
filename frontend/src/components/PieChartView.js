@@ -15,7 +15,7 @@ function PieChartView({ refreshTrigger }) {
     setError('');
 
     try {
-      const logs = await getLogs(0, 10000, { group_by_request_id: false });
+      const logs = await getLogs(0, 2000, { group_by_request_id: false });
       
       // Count logs by level
       const stats = {};
