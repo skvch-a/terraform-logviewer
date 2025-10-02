@@ -57,7 +57,7 @@ def parse_terraform_log_with_sections(content: str, filename: str) -> dict:
 
     Возвращает словарь с информацией о секциях и логах.
     """
-    logs = parse_terraform_log(content)
+    logs, fixed_count = parse_terraform_log(content)
 
     # Анализ секций
     sections = []
@@ -109,12 +109,18 @@ def parse_terraform_log_with_sections(content: str, filename: str) -> dict:
             for section in sections
         ],
         'filename': filename,
-        'total_logs': len(logs)
+        'total_logs': len(logs),
+        'fixed_logs_count': fixed_count
     }
 
 
-def parse_terraform_log(content: str) -> list[dict]:
-    """Parse Terraform JSON log file."""
+def parse_terraform_log(content: str) -> tuple[list[dict], int]:
+    """
+    Parse Terraform JSON log file.
+    
+    Returns:
+        tuple: (parsed_logs, count_of_fixed_entries)
+    """
     logs = []
 
     # Try to parse as JSON array first

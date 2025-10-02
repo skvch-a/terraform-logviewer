@@ -31,7 +31,7 @@ async def upload_log_file(
     content_str = content.decode('utf-8')
 
     # Parse the log file
-    logs = parse_terraform_log(content_str)
+    logs, fixed_count = parse_terraform_log(content_str)
 
     if not logs:
         raise HTTPException(status_code=400, detail="No valid log entries found in the file")
@@ -42,7 +42,8 @@ async def upload_log_file(
     return LogUploadResponse(
         message="File uploaded successfully",
         entries_count=count,
-        filename=file.filename
+        filename=file.filename,
+        fixed_logs_count=fixed_count
     )
 
 
