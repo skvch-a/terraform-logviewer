@@ -209,16 +209,15 @@ def get_gantt_data(db: Session) -> list[dict]:
     """
     Get aggregated request data for Gantt chart visualization.
     Groups logs by tf_req_id and calculates start/end timestamps.
+    Optimized: no full log storage, no per-group sorting.
     """
-    from sqlalchemy import func
-    from datetime import datetime
-    
-    # Query to get all logs with tf_req_id
-    logs_with_req_id = db.query(TerraformLog).filter(
-        TerraformLog.tf_req_id.isnot(None)
-    ).order_by(TerraformLog.timestamp).all()
-    
-    # Group by tf_req_id
+    logs_with_req_id = (
+        db.query(TerraformLog)
+        .filter(TerraformLog.tf_req_id.isnot(None))
+        .order_by(TerraformLog.timestamp)
+        .all()
+    )
+
     requests_data = {}
     for log in logs_with_req_id:
         req_id = log.tf_req_id
@@ -227,38 +226,26 @@ def get_gantt_data(db: Session) -> list[dict]:
                 'tf_req_id': req_id,
                 'tf_rpc': log.tf_rpc,
                 'tf_resource_type': log.tf_resource_type,
-                'logs': [],
-                'start_timestamp': None,
-                'end_timestamp': None,
+                'start_timestamp': log.timestamp,
+                'end_timestamp': log.timestamp,
+                'log_count': 1,
             }
-        
-        requests_data[req_id]['logs'].append({
-            'timestamp': log.timestamp,
-            'level': log.log_level,
-            'message': log.message,
-        })
-        
-        # Update RPC and resource type if not set
-        if not requests_data[req_id]['tf_rpc'] and log.tf_rpc:
-            requests_data[req_id]['tf_rpc'] = log.tf_rpc
-        if not requests_data[req_id]['tf_resource_type'] and log.tf_resource_type:
-            requests_data[req_id]['tf_resource_type'] = log.tf_resource_type
-    
-    # Calculate start and end timestamps for each request
-    gantt_data = []
-    for req_id, data in requests_data.items():
-        if data['logs']:
-            # Sort logs by timestamp
-            sorted_logs = sorted(data['logs'], key=lambda x: x['timestamp'] or '')
-            data['start_timestamp'] = sorted_logs[0]['timestamp']
-            data['end_timestamp'] = sorted_logs[-1]['timestamp']
-            data['log_count'] = len(sorted_logs)
-            
-            # Remove individual logs from response to reduce payload
-            del data['logs']
-            gantt_data.append(data)
-    
-    # Sort by start timestamp
+        else:
+            data = requests_data[req_id]
+
+            if log.timestamp and (not data['start_timestamp'] or log.timestamp < data['start_timestamp']):
+                data['start_timestamp'] = log.timestamp
+            if log.timestamp and (not data['end_timestamp'] or log.timestamp > data['end_timestamp']):
+                data['end_timestamp'] = log.timestamp
+            data['log_count'] += 1
+
+            if not data['tf_rpc'] and log.tf_rpc:
+                data['tf_rpc'] = log.tf_rpc
+            if not data['tf_resource_type'] and log.tf_resource_type:
+                data['tf_resource_type'] = log.tf_resource_type
+
+    gantt_data = list(requests_data.values())
     gantt_data.sort(key=lambda x: x['start_timestamp'] or '')
-    
+
     return gantt_data
+
