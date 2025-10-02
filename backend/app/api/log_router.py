@@ -4,6 +4,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models import TerraformLog
 from app.schemas import LogEntry, LogUploadResponse, LogWithSectionsResponse, DeleteResponse
 from app.services import (
     parse_terraform_log, 
