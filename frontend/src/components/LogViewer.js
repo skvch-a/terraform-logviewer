@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getLogs, getRequestIds, getLogsByRequestId } from '../services/api';
+import { getLogs, getRequestIds, getLogsByRequestId, sendErrorsToSentry } from '../services/api';
 
 function LogViewer({ refreshTrigger }) {
   const [logs, setLogs] = useState([]);
@@ -19,6 +19,10 @@ function LogViewer({ refreshTrigger }) {
   const [reqIdFilter, setReqIdFilter] = useState('');
   const [rpcFilter, setRpcFilter] = useState('');
   const [messageFilter, setMessageFilter] = useState('');
+
+  // State for Sentry integration
+  const [sentrySending, setSentrySending] = useState(false);
+  const [sentryMessage, setSentryMessage] = useState('');
 
 
   const fetchLogs = useCallback(async () => {
@@ -109,6 +113,22 @@ function LogViewer({ refreshTrigger }) {
     fetchLogs();
   };
 
+  const handleSendToSentry = async () => {
+    setSentrySending(true);
+    setSentryMessage('');
+
+    try {
+      const result = await sendErrorsToSentry();
+      setSentryMessage(result.message || `Sent ${result.count} errors to Sentry`);
+      setTimeout(() => setSentryMessage(''), 5000); // Clear message after 5 seconds
+    } catch (err) {
+      setSentryMessage(`Error: ${err.message}`);
+      setTimeout(() => setSentryMessage(''), 5000);
+    } finally {
+      setSentrySending(false);
+    }
+  };
+
   const getLevelColor = (level) => {
     const colors = {
       error: '#dc3545',
@@ -125,13 +145,27 @@ function LogViewer({ refreshTrigger }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2>Terraform Logs</h2>
-        <button 
-          onClick={() => setGroupByRequestId(!groupByRequestId)}
-          style={styles.groupToggleButton}
-        >
-          {groupByRequestId ? '📋 Disable Grouping' : '📋 Enable Grouping'}
-        </button>
+        <div style={styles.headerButtons}>
+          <button 
+            onClick={() => setGroupByRequestId(!groupByRequestId)}
+            style={styles.groupToggleButton}
+          >
+            {groupByRequestId ? '📋 Disable Grouping' : '📋 Enable Grouping'}
+          </button>
+          <button 
+            onClick={handleSendToSentry}
+            style={styles.sentryButton}
+            disabled={sentrySending}
+          >
+            {sentrySending ? '⏳ Sending...' : '🚨 Send Errors to Sentry'}
+          </button>
+        </div>
       </div>
+      {sentryMessage && (
+        <div style={styles.sentryMessage}>
+          {sentryMessage}
+        </div>
+      )}
 
       <form onSubmit={handleFilterSubmit} style={styles.filterForm}>
         <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={styles.input}>
@@ -301,6 +335,11 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center'
   },
+  headerButtons: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+  },
   groupToggleButton: {
     padding: '8px 15px',
     borderRadius: '4px',
@@ -308,6 +347,24 @@ const styles = {
     backgroundColor: '#6c757d',
     color: 'white',
     cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  sentryButton: {
+    padding: '8px 15px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: '#dc3545',
+    color: 'white',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  sentryMessage: {
+    padding: '10px',
+    backgroundColor: '#d4edda',
+    color: '#155724',
+    borderRadius: '4px',
+    marginBottom: '20px',
+    textAlign: 'center',
     fontWeight: 'bold',
   },
   filterForm: {

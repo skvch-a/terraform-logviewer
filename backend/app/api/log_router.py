@@ -14,7 +14,8 @@ from app.services import (
     get_logs_by_level,
     delete_all_logs,
     get_gantt_data,
-    get_sections_from_db
+    get_sections_from_db,
+    send_error_logs_to_sentry
 )
 
 router = APIRouter()
@@ -185,3 +186,13 @@ def get_logs_by_request_id(
         logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id == request_id).order_by(TerraformLog.timestamp).all()
     
     return logs
+
+
+@router.post("/sentry/send-errors")
+def send_errors_to_sentry(db: Session = Depends(get_db)):
+    """Send all ERROR level logs to Sentry."""
+    # Sentry DSN from the requirements
+    sentry_dsn = 'https://299b315b194c0178cc2c8d5d56f36f80@o4510118700449792.ingest.de.sentry.io/4510118735642704'
+    
+    result = send_error_logs_to_sentry(db, sentry_dsn)
+    return result
