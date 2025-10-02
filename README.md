@@ -32,7 +32,7 @@
 
 ### Инфраструктура
 - Docker & Docker Compose
-- PostgreSQL 15
+- PostgreSQL 16
 
 ## Установка и запуск
 
