@@ -24,6 +24,10 @@ function LogViewer({ refreshTrigger }) {
   const [sentrySending, setSentrySending] = useState(false);
   const [sentryMessage, setSentryMessage] = useState('');
 
+  // State for read status
+  const [readSections, setReadSections] = useState(new Set());
+  const [readLogs, setReadLogs] = useState(new Set());
+
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -141,6 +145,18 @@ function LogViewer({ refreshTrigger }) {
     return colors[level?.toLowerCase()] || '#000';
   };
 
+  const hasErrorLogs = (logList) => {
+    return logList.some(log => log.log_level?.toLowerCase() === 'error');
+  };
+
+  const markSectionAsRead = (sectionId) => {
+    setReadSections(prev => new Set([...prev, sectionId]));
+  };
+
+  const markLogAsRead = (logId) => {
+    setReadLogs(prev => new Set([...prev, logId]));
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -228,99 +244,182 @@ function LogViewer({ refreshTrigger }) {
         {groupByRequestId ? (
           requestIds.length > 0 ? (
             // Lazy loading mode: show request IDs first
-            requestIds.map((reqInfo) => (
-              <details 
-                key={reqInfo.tf_req_id} 
-                style={styles.logGroup}
-                onToggle={(e) => handleRequestToggle(e, reqInfo.tf_req_id)}
-              >
-                <summary style={styles.groupSummary}>
-                  Request ID: {reqInfo.tf_req_id} ({reqInfo.log_count} entries)
-                  {reqInfo.start_timestamp && (
-                    <span style={styles.timestampRange}> - {new Date(reqInfo.start_timestamp).toLocaleString()}</span>
+            requestIds.map((reqInfo) => {
+              const logsForSection = loadedRequestIds[reqInfo.tf_req_id] || [];
+              const hasErrors = hasErrorLogs(logsForSection);
+              const isRead = readSections.has(reqInfo.tf_req_id);
+              
+              return (
+                <details 
+                  key={reqInfo.tf_req_id} 
+                  style={{
+                    ...styles.logGroup,
+                    ...(hasErrors && !isRead ? styles.errorGroup : {}),
+                    ...(isRead ? styles.readGroup : {})
+                  }}
+                  onToggle={(e) => handleRequestToggle(e, reqInfo.tf_req_id)}
+                >
+                  <summary style={{
+                    ...styles.groupSummary,
+                    ...(hasErrors && !isRead ? styles.errorSummary : {})
+                  }}>
+                    {hasErrors && !isRead && <span style={styles.errorBadge}>⚠️ ERROR</span>}
+                    {isRead && <span style={styles.readBadge}>✓ Read</span>}
+                    Request ID: {reqInfo.tf_req_id} ({reqInfo.log_count} entries)
+                    {reqInfo.start_timestamp && (
+                      <span style={styles.timestampRange}> - {new Date(reqInfo.start_timestamp).toLocaleString()}</span>
+                    )}
+                    {logsForSection.length > 0 && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); markSectionAsRead(reqInfo.tf_req_id); }}
+                        style={styles.markReadButton}
+                      >
+                        Mark as Read
+                      </button>
+                    )}
+                  </summary>
+                  {loadingRequestIds[reqInfo.tf_req_id] ? (
+                    <div style={styles.loadingMessage}>Loading logs...</div>
+                  ) : loadedRequestIds[reqInfo.tf_req_id] ? (
+                    loadedRequestIds[reqInfo.tf_req_id].map((log) => {
+                      const logIsRead = readLogs.has(log.id);
+                      return (
+                        <div key={log.id} style={{
+                          ...styles.logEntry,
+                          ...(logIsRead ? styles.readLogEntry : {})
+                        }}>
+                          <div style={styles.logHeader}>
+                            <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
+                              {log.log_level || 'UNKNOWN'}
+                            </span>
+                            <span style={styles.timestamp}>{log.timestamp}</span>
+                            <span style={styles.filename}>{log.filename}</span>
+                            <button 
+                              onClick={() => markLogAsRead(log.id)}
+                              style={styles.markReadButtonSmall}
+                            >
+                              {logIsRead ? '✓' : 'Mark Read'}
+                            </button>
+                          </div>
+                          <div style={styles.logMessage}>{log.message}</div>
+                          {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
+                          {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
+                          {log.raw_data && (
+                            <details style={styles.details}>
+                              <summary style={styles.summary}>Raw Data</summary>
+                              <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
+                            </details>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={styles.placeholderMessage}>Click to load logs</div>
                   )}
-                </summary>
-                {loadingRequestIds[reqInfo.tf_req_id] ? (
-                  <div style={styles.loadingMessage}>Loading logs...</div>
-                ) : loadedRequestIds[reqInfo.tf_req_id] ? (
-                  loadedRequestIds[reqInfo.tf_req_id].map((log) => (
-                    <div key={log.id} style={styles.logEntry}>
-                      <div style={styles.logHeader}>
-                        <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
-                          {log.log_level || 'UNKNOWN'}
-                        </span>
-                        <span style={styles.timestamp}>{log.timestamp}</span>
-                        <span style={styles.filename}>{log.filename}</span>
-                      </div>
-                      <div style={styles.logMessage}>{log.message}</div>
-                       {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
-                       {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
-                      {log.raw_data && (
-                        <details style={styles.details}>
-                          <summary style={styles.summary}>Raw Data</summary>
-                          <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
-                        </details>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div style={styles.placeholderMessage}>Click to load logs</div>
-                )}
-              </details>
-            ))
+                </details>
+              );
+            })
           ) : (
             // Regular grouped view (when filters are applied)
-            Object.entries(groupedLogs).map(([reqId, logGroup]) => (
-              <details key={reqId} style={styles.logGroup} open>
-                <summary style={styles.groupSummary}>
-                  Request ID: {reqId} ({logGroup.length} entries)
-                </summary>
-                {logGroup.map((log) => (
-                  <div key={log.id} style={styles.logEntry}>
-                    <div style={styles.logHeader}>
-                      <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
-                        {log.log_level || 'UNKNOWN'}
-                      </span>
-                      <span style={styles.timestamp}>{log.timestamp}</span>
-                      <span style={styles.filename}>{log.filename}</span>
-                    </div>
-                    <div style={styles.logMessage}>{log.message}</div>
-                     {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
-                     {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
-                    {log.raw_data && (
-                      <details style={styles.details}>
-                        <summary style={styles.summary}>Raw Data</summary>
-                        <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
-                      </details>
-                    )}
-                  </div>
-                ))}
-              </details>
-            ))
+            Object.entries(groupedLogs).map(([reqId, logGroup]) => {
+              const hasErrors = hasErrorLogs(logGroup);
+              const isRead = readSections.has(reqId);
+              
+              return (
+                <details 
+                  key={reqId} 
+                  style={{
+                    ...styles.logGroup,
+                    ...(hasErrors && !isRead ? styles.errorGroup : {}),
+                    ...(isRead ? styles.readGroup : {})
+                  }}
+                  open
+                >
+                  <summary style={{
+                    ...styles.groupSummary,
+                    ...(hasErrors && !isRead ? styles.errorSummary : {})
+                  }}>
+                    {hasErrors && !isRead && <span style={styles.errorBadge}>⚠️ ERROR</span>}
+                    {isRead && <span style={styles.readBadge}>✓ Read</span>}
+                    Request ID: {reqId} ({logGroup.length} entries)
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); markSectionAsRead(reqId); }}
+                      style={styles.markReadButton}
+                    >
+                      Mark as Read
+                    </button>
+                  </summary>
+                  {logGroup.map((log) => {
+                    const logIsRead = readLogs.has(log.id);
+                    return (
+                      <div key={log.id} style={{
+                        ...styles.logEntry,
+                        ...(logIsRead ? styles.readLogEntry : {})
+                      }}>
+                        <div style={styles.logHeader}>
+                          <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
+                            {log.log_level || 'UNKNOWN'}
+                          </span>
+                          <span style={styles.timestamp}>{log.timestamp}</span>
+                          <span style={styles.filename}>{log.filename}</span>
+                          <button 
+                            onClick={() => markLogAsRead(log.id)}
+                            style={styles.markReadButtonSmall}
+                          >
+                            {logIsRead ? '✓' : 'Mark Read'}
+                          </button>
+                        </div>
+                        <div style={styles.logMessage}>{log.message}</div>
+                        {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
+                        {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
+                        {log.raw_data && (
+                          <details style={styles.details}>
+                            <summary style={styles.summary}>Raw Data</summary>
+                            <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })}
+                </details>
+              );
+            })
           )
         ) : (
           // Flat view
-          logs.map((log) => (
-            <div key={log.id} style={styles.logEntryFlat}>
-              <div style={styles.logHeader}>
-                <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
-                  {log.log_level || 'UNKNOWN'}
-                </span>
-                <span style={styles.timestamp}>{log.timestamp}</span>
-                <span style={styles.filename}>{log.filename}</span>
-                {log.tf_req_id && <span style={styles.reqId}>Request ID: {log.tf_req_id}</span>}
+          logs.map((log) => {
+            const logIsRead = readLogs.has(log.id);
+            return (
+              <div key={log.id} style={{
+                ...styles.logEntryFlat,
+                ...(logIsRead ? styles.readLogEntry : {})
+              }}>
+                <div style={styles.logHeader}>
+                  <span style={{ ...styles.logLevel, backgroundColor: getLevelColor(log.log_level) }}>
+                    {log.log_level || 'UNKNOWN'}
+                  </span>
+                  <span style={styles.timestamp}>{log.timestamp}</span>
+                  <span style={styles.filename}>{log.filename}</span>
+                  {log.tf_req_id && <span style={styles.reqId}>Request ID: {log.tf_req_id}</span>}
+                  <button 
+                    onClick={() => markLogAsRead(log.id)}
+                    style={styles.markReadButtonSmall}
+                  >
+                    {logIsRead ? '✓' : 'Mark Read'}
+                  </button>
+                </div>
+                <div style={styles.logMessage}>{log.message}</div>
+                {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
+                {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
+                {log.raw_data && (
+                  <details style={styles.details}>
+                    <summary style={styles.summary}>Raw Data</summary>
+                    <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
+                  </details>
+                )}
               </div>
-              <div style={styles.logMessage}>{log.message}</div>
-               {log.tf_resource_type && <div style={styles.metadata}><strong>Resource:</strong> {log.tf_resource_type}</div>}
-               {log.tf_rpc && <div style={styles.metadata}><strong>RPC:</strong> {log.tf_rpc}</div>}
-              {log.raw_data && (
-                <details style={styles.details}>
-                  <summary style={styles.summary}>Raw Data</summary>
-                  <pre style={styles.rawData}>{JSON.stringify(log.raw_data, null, 2)}</pre>
-                </details>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -394,11 +493,67 @@ const styles = {
     border: '1px solid #ccc',
     borderRadius: '4px',
   },
+  errorGroup: {
+    border: '2px solid #dc3545',
+    boxShadow: '0 0 8px rgba(220, 53, 69, 0.3)',
+  },
+  readGroup: {
+    opacity: 0.6,
+    border: '1px solid #28a745',
+  },
   groupSummary: {
     padding: '10px',
     cursor: 'pointer',
     backgroundColor: '#f5f5f5',
     fontWeight: 'bold',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    flexWrap: 'wrap',
+  },
+  errorSummary: {
+    backgroundColor: '#f8d7da',
+  },
+  errorBadge: {
+    backgroundColor: '#dc3545',
+    color: 'white',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+  },
+  readBadge: {
+    backgroundColor: '#28a745',
+    color: 'white',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+  },
+  markReadButton: {
+    padding: '6px 12px',
+    backgroundColor: '#28a745',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    marginLeft: 'auto',
+  },
+  markReadButtonSmall: {
+    padding: '4px 8px',
+    backgroundColor: '#17a2b8',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '11px',
+    marginLeft: 'auto',
+  },
+  readLogEntry: {
+    opacity: 0.5,
+    backgroundColor: '#e8f5e9',
   },
   logEntry: {
     backgroundColor: 'white',
