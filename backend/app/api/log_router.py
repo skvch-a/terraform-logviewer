@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
@@ -7,10 +8,9 @@ from app.database import get_db
 from app.models import TerraformLog
 from app.schemas import LogEntry, LogUploadResponse, LogWithSectionsResponse, DeleteResponse
 from app.services import (
-    parse_terraform_log, 
-    parse_terraform_log_with_sections,
-    save_logs_to_db, 
-    get_all_logs, 
+    parse_terraform_log,
+    save_logs_to_db,
+    get_all_logs,
     get_logs_by_level,
     delete_all_logs,
     get_gantt_data,
@@ -49,10 +49,20 @@ async def upload_log_file(
         fixed_logs_count=fixed_count
     )
 
+
+@router.post("/sentry/send-errors")
+def send_errors_to_sentry(db: Session = Depends(get_db)):
+    """Send all ERROR level logs to Sentry."""
+    # Sentry DSN from the requirements
+    sentry_dsn = os.getenv("SENTRY_DSN")
+    result = send_error_logs_to_sentry(db, sentry_dsn)
+    return result
+
+
 @router.get("/logs", response_model=List[LogEntry])
 def get_logs(
         skip: int = Query(0, ge=0),
-        limit: int = Query(100, ge=1, le=1000),
+        limit: int = Query(100, ge=1, le=2000),
         level: Optional[str] = None,
         tf_resource_type: Optional[str] = None,
         start_timestamp: Optional[str] = None,
@@ -83,16 +93,6 @@ def get_logs(
     return logs
 
 
-@router.delete("/sessions", response_model=DeleteResponse)
-def clear_session(db: Session = Depends(get_db)):
-    """Clear all logs from the database (reset session)."""
-    count = delete_all_logs(db)
-    return DeleteResponse(
-        message="Session cleared successfully",
-        deleted_count=count
-    )
-
-
 @router.get("/gantt")
 def get_gantt_chart_data(db: Session = Depends(get_db)):
     """Get aggregated request data for Gantt chart visualization."""
@@ -111,7 +111,7 @@ def get_sections_data(db: Session = Depends(get_db)):
 def get_request_ids(db: Session = Depends(get_db)):
     """Get list of unique request IDs with basic metadata."""
     from sqlalchemy import func
-    
+
     # Get unique request IDs with count
     result = (
         db.query(
@@ -125,12 +125,12 @@ def get_request_ids(db: Session = Depends(get_db)):
         .order_by(func.min(TerraformLog.timestamp))
         .all()
     )
-    
+
     # Also get logs without request_id
     no_req_id_count = db.query(func.count(TerraformLog.id)).filter(
         TerraformLog.tf_req_id.is_(None)
     ).scalar()
-    
+
     request_ids = [
         {
             'tf_req_id': row.tf_req_id,
@@ -140,7 +140,7 @@ def get_request_ids(db: Session = Depends(get_db)):
         }
         for row in result
     ]
-    
+
     # Add no-request-id group if exists
     if no_req_id_count > 0:
         request_ids.append({
@@ -149,7 +149,7 @@ def get_request_ids(db: Session = Depends(get_db)):
             'start_timestamp': None,
             'end_timestamp': None
         })
-    
+
     return request_ids
 
 
@@ -162,16 +162,17 @@ def get_logs_by_request_id(
     if request_id == 'no-request-id':
         logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id.is_(None)).order_by(TerraformLog.timestamp).all()
     else:
-        logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id == request_id).order_by(TerraformLog.timestamp).all()
-    
+        logs = db.query(TerraformLog).filter(TerraformLog.tf_req_id == request_id).order_by(
+            TerraformLog.timestamp).all()
+
     return logs
 
 
-@router.post("/sentry/send-errors")
-def send_errors_to_sentry(db: Session = Depends(get_db)):
-    """Send all ERROR level logs to Sentry."""
-    # Sentry DSN from the requirements
-    sentry_dsn = 'https://299b315b194c0178cc2c8d5d56f36f80@o4510118700449792.ingest.de.sentry.io/4510118735642704'
-    
-    result = send_error_logs_to_sentry(db, sentry_dsn)
-    return result
+@router.delete("/sessions", response_model=DeleteResponse)
+def clear_session(db: Session = Depends(get_db)):
+    """Clear all logs from the database (reset session)."""
+    count = delete_all_logs(db)
+    return DeleteResponse(
+        message="Session cleared successfully",
+        deleted_count=count
+    )
