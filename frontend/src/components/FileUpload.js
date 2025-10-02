@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {clearSession, uploadLogFile} from '../services/api';
 
 function FileUpload({onUploadSuccess}) {
@@ -6,10 +6,15 @@ function FileUpload({onUploadSuccess}) {
     const [uploading, setUploading] = useState(false);
     const [clearing, setClearing] = useState(false);
     const [message, setMessage] = useState('');
+    const fileInputRef = useRef(null);
 
     const handleFileChange = (e) => {
         setFile(e.target.files[0]);
         setMessage('');
+    };
+
+    const handleFileButtonClick = () => {
+        fileInputRef.current.click();
     };
 
     const handleUpload = async () => {
@@ -60,16 +65,22 @@ function FileUpload({onUploadSuccess}) {
         <div style={styles.container}>
             <h2>Upload Terraform Log File</h2>
             <div style={styles.uploadArea}>
-
-                <label style={styles.fileInputLabel}>
+                {/* Скрытый input */}
+                <input
+                    type="file"
+                    accept=".json,.log"
+                    onChange={handleFileChange}
+                    ref={fileInputRef}
+                    style={styles.hiddenFileInput}
+                />
+                {/* Кнопка выбора файла */}
+                <button
+                    type="button"
+                    onClick={handleFileButtonClick}
+                    style={styles.fileButton}
+                >
                     {file ? file.name : 'Choose File'}
-                    <input
-                        type="file"
-                        accept=".json,.log"
-                        onChange={handleFileChange}
-                        style={styles.hiddenFileInput}
-                    />
-                </label>
+                </button>
 
                 <button
                     onClick={handleUpload}
@@ -106,12 +117,12 @@ const styles = {
     },
     uploadArea: {
         display: 'flex',
-        gap: '10px',
         alignItems: 'center',
+        gap: '10px', // равные промежутки между кнопками
     },
-    fileInputLabel: {
+    fileButton: {
         padding: '10px 20px',
-        backgroundColor: '#2da318',
+        backgroundColor: 'green',
         color: 'white',
         border: 'none',
         borderRadius: '4px',
@@ -129,7 +140,6 @@ const styles = {
         borderRadius: '4px',
         cursor: 'pointer',
         fontWeight: 'bold',
-        marginLeft: '100px'
     },
     clearButton: {
         padding: '10px 20px',
